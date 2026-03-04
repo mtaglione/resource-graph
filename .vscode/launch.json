@@ -1,0 +1,35 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+          
+		{
+			"name": ".NET: Build + Debug localhost (GraphMcpServer)",
+			"type": "coreclr",
+			"request": "launch",
+			"preLaunchTask": "build",
+			"program": "dotnet",
+			"args": [
+				"run",
+				"--project",
+				"${workspaceFolder}/GraphMcpServer/GraphMcpServer.csproj",
+				"--urls",
+				"http://localhost:5000"
+			],
+			"cwd": "${workspaceFolder}/GraphMcpServer",
+			"env": {
+				"ASPNETCORE_ENVIRONMENT": "Development",
+				"DOTNET_ENVIRONMENT": "Development"
+			},
+			"serverReadyAction": {
+				"action": "openExternally",
+				"pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+			},
+			"console": "integratedTerminal",
+			"stopAtEntry": false
+		}
+
+	]
+}

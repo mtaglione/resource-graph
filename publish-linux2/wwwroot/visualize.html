@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MEP Resource Hierarchy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #04070f;
+    --surface: rgba(6,11,22,0.92);
+    --border: rgba(96,165,250,0.1);
+    --border-hover: rgba(96,165,250,0.35);
+    --text-primary: #e2eaf5;
+    --text-secondary: #5c7494;
+    --text-muted: #2d3f54;
+    --accent: #3b82f6;
+    --accent-warm: #f59e0b;
+    --accent-teal: #14b8a6;
+    --accent-green: #22c55e;
+    --accent-red: #ef4444;
+    --accent-purple: #a855f7;
+    --accent-orange: #f97316;
+
+    --c-core: #ef4444;
+    --c-trade: #f59e0b;
+    --c-csiGroup: #3b82f6;
+    --c-csiSub: #14b8a6;
+    --c-sector: #22c55e;
+    --c-resource: #a855f7;
+    --c-discipline: #f97316;
+    --c-specialty: rgba(59,130,246,0.55);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    overflow: hidden;
+    font-family: 'Syne', sans-serif;
+    color: var(--text-primary);
+    cursor: default;
+  }
+
+  /* ── Noise grain overlay ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+    opacity: 0.018;
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* ── Radial ambient light ── */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 20% 20%, rgba(59,130,246,0.04) 0%, transparent 70%),
+      radial-gradient(ellipse 60% 80% at 80% 80%, rgba(239,68,68,0.03) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 50% at 50% 50%, rgba(20,184,166,0.02) 0%, transparent 80%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  svg { display: block; position: relative; z-index: 1; }
+
+  /* ── HUD Title ── */
+  .hud {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 14px 40px;
+    z-index: 20;
+    text-align: center;
+    background: linear-gradient(to bottom, rgba(4,7,15,0.9), transparent);
+    pointer-events: none;
+  }
+
+  .hud-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  .hud-title {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-primary);
+    line-height: 1;
+  }
+
+  .hud-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-top: 5px;
+    letter-spacing: 2px;
+  }
+
+  /* ── Stats panel (left) ── */
+  .stats-panel {
+    position: fixed;
+    top: 50%;
+    left: 20px;
+    transform: translateY(-50%);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stat-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    transition: border-color 0.3s;
+  }
+
+  .stat-row:hover { border-color: var(--border-hover); }
+
+  .stat-row-num {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    min-width: 36px;
+  }
+
+  .stat-row-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+
+  /* ── Controls (top-right) ── */
+  .controls {
+    position: fixed;
+    top: 16px;
+    right: 20px;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .control-group {
+    display: flex;
+    gap: 4px;
+  }
+
+  .ctrl-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    border-radius: 5px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .ctrl-btn:hover {
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+  }
+
+  .ctrl-btn.active {
+    border-color: rgba(59,130,246,0.5);
+    color: var(--accent);
+    background: rgba(59,130,246,0.07);
+  }
+
+  /* ── Search ── */
+  .search-wrap {
+    position: fixed;
+    top: 60px;
+    right: 20px;
+    z-index: 20;
+  }
+
+  .search-wrap input {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    border-radius: 5px;
+    padding: 7px 12px;
+    width: 170px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .search-wrap input::placeholder { color: var(--text-muted); }
+  .search-wrap input:focus { border-color: var(--border-hover); }
+
+  /* ── Legend (bottom-left) ── */
+  .legend {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 20;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    min-width: 170px;
+  }
+
+  .legend-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 6px 0;
+    font-size: 10px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    letter-spacing: 0.3px;
+  }
+
+  .legend-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 6px currentColor;
+  }
+
+  .legend-hint {
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    line-height: 1.7;
+  }
+
+  /* ── Filter bar (bottom-right) ── */
+  .filter-bar {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 20;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-width: 280px;
+    justify-content: flex-end;
+  }
+
+  .filter-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: 4px;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .filter-btn:hover,
+  .filter-btn.active {
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+  }
+
+  /* ── Tooltip ── */
+  .tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: rgba(4,7,15,0.97);
+    border: 1px solid rgba(96,165,250,0.2);
+    border-radius: 8px;
+    padding: 14px 18px;
+    color: var(--text-primary);
+    font-size: 11px;
+    max-width: 280px;
+    opacity: 0;
+    transition: opacity 0.12s;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.02);
+    z-index: 500;
+  }
+
+  .tt-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 3px;
+  }
+
+  .tt-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 5px;
+    letter-spacing: 0.3px;
+  }
+
+  .tt-csi {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--accent);
+    margin-bottom: 5px;
+    letter-spacing: 1px;
+  }
+
+  .tt-detail {
+    font-size: 10.5px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 5px;
+  }
+
+  .tt-stat {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--accent);
+    padding: 5px 8px;
+    background: rgba(59,130,246,0.07);
+    border-radius: 4px;
+    margin-bottom: 6px;
+    border-left: 2px solid rgba(59,130,246,0.4);
+  }
+
+  .tt-types {
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+    margin-bottom: 5px;
+  }
+
+  .tt-type-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+  }
+
+  .tt-connections {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255,255,255,0.04);
+  }
+
+  /* ── Watermark ── */
+  .watermark {
+    position: fixed;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    opacity: 0.4;
+    z-index: 20;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- HUD -->
+<div class="hud">
+  <div class="hud-eyebrow">Engineering Resource Intelligence</div>
+  <div class="hud-title">MEP Resource Hierarchy</div>
+  <div class="hud-sub">443 Documents · 65 CSI Sections · 3 Trades · 10 Sectors</div>
+</div>
+
+<!-- Stats -->
+<div class="stats-panel">
+  <div class="stat-row">
+    <div class="stat-row-num" id="nodeCount">—</div>
+    <div class="stat-row-label">Nodes</div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-row-num" id="linkCount">—</div>
+    <div class="stat-row-label">Links</div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-row-num">443</div>
+    <div class="stat-row-label">Docs</div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-row-num">65</div>
+    <div class="stat-row-label">CSI</div>
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <div class="control-group">
+    <button class="ctrl-btn" onclick="resetView()">↺ Reset</button>
+    <button class="ctrl-btn active" id="btnLabels" onclick="toggleLabels()">Labels</button>
+    <button class="ctrl-btn" id="btnPulse" onclick="toggleParticles()">Pulse</button>
+  </div>
+</div>
+
+<!-- Search -->
+<div class="search-wrap">
+  <input id="search" placeholder="Search nodes…" oninput="onSearch(this.value)">
+</div>
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-title">Hierarchy</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--c-core);color:var(--c-core)"></div>Organization Core</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--c-trade);color:var(--c-trade)"></div>Trades / Division</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--c-csiGroup);color:var(--c-csiGroup)"></div>CSI System Groups</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--c-csiSub);color:var(--c-csiSub)"></div>CSI Subsections</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--c-sector);color:var(--c-sector)"></div>Sectors</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--c-resource);color:var(--c-resource)"></div>Resource Types</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--c-discipline);color:var(--c-discipline)"></div>Disciplines</div>
+  <div class="legend-item"><div class="legend-dot" style="background:rgba(59,130,246,0.5);color:rgba(59,130,246,0.5)"></div>Specialties</div>
+  <div class="legend-hint">Drag · Scroll zoom · Click to pin<br>Hover to trace connections</div>
+</div>
+
+<!-- Filter bar -->
+<div class="filter-bar" id="filterBar"></div>
+
+<!-- Tooltip -->
+<div class="tooltip" id="tooltip"></div>
+
+<!-- Watermark -->
+<div class="watermark">MEP Engineering · Resource Intelligence</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>
+const W = window.innerWidth, H = window.innerHeight;
+
+// ─── COLOR PALETTE ───
+const C = {
+  core: '#ef4444',
+  trade: '#f59e0b',
+  csiGroup: '#3b82f6',
+  csiSub: '#14b8a6',
+  sector: '#22c55e',
+  resource: '#a855f7',
+  discipline: '#f97316',
+  specialty: 'rgba(59,130,246,0.6)'
+};
+
+const typeColors = {
+  Details: '#3b82f6',
+  Guides: '#22c55e',
+  Templates: '#f59e0b',
+  Forms: '#a855f7',
+  Specifications: '#ef4444',
+  Calculators: '#f97316'
+};
+
+// ─── DATA ───
+const nodes = [], links = [];
+function N(id, label, group, r, opts = {}) { nodes.push({ id, label, group, r, ...opts }); return id; }
+function L(s, t, str = 0.3, g) { links.push({ source: s, target: t, strength: str, group: g || '' }); }
+
+// CORE
+N('org', 'Organization', 'core', 30, { detail: 'MEP Engineering Resource Library', stat: '443 documents across 65 CSI sections' });
+
+// TRADES
+N('t_elec', 'Electrical', 'trade', 22, { detail: 'Division 26 — Power, Lighting, Systems', stat: '307 documents', docs: 307 });
+N('t_mpfp', 'MPFP', 'trade', 18, { detail: 'Division 20 — Mechanical/Plumbing/Fire Protection', stat: '102 documents', docs: 102 });
+N('t_sec', 'Electronic Safety', 'trade', 14, { detail: 'Division 28 — Security & Fire Alarm', stat: '36 documents', docs: 36 });
+L('org', 't_elec', 0.5); L('org', 't_mpfp', 0.4); L('org', 't_sec', 0.35);
+
+// RESOURCE TYPES
+N('r_details', 'Details', 'resource', 18, { detail: 'Construction details & drawings', stat: '173 documents (39%)', docs: 173 });
+N('r_guides', 'Guides', 'resource', 15, { detail: 'Design guidelines & reference docs', stat: '80 documents (18%)', docs: 80 });
+N('r_templates', 'Templates', 'resource', 14, { detail: 'Submittal & design templates', stat: '64 documents (14%)', docs: 64 });
+N('r_forms', 'Forms', 'resource', 14, { detail: 'Inspection forms & checklists', stat: '57 documents (13%)', docs: 57 });
+N('r_specs', 'Specifications', 'resource', 14, { detail: 'Technical specifications', stat: '64 documents (14%)', docs: 64 });
+N('r_calcs', 'Calculators', 'resource', 9, { detail: 'Calculation tools', stat: '6 documents (1%)', docs: 6 });
+L('org', 'r_details', 0.2); L('org', 'r_guides', 0.2); L('org', 'r_templates', 0.2);
+L('org', 'r_forms', 0.2); L('org', 'r_specs', 0.2); L('org', 'r_calcs', 0.15);
+
+// SECTORS
+const sectors = [
+  ['s_health', 'Healthcare'], ['s_scitech', 'Sci & Tech'], ['s_higher', 'Higher Ed'],
+  ['s_cultural', 'Cultural'], ['s_commercial', 'Commercial'], ['s_infra', 'Infrastructure'],
+  ['s_residential', 'Residential'], ['s_hospitality', 'Hospitality'], ['s_aviation', 'Aviation'],
+  ['s_datacenter', 'Data Centers']
+];
+sectors.forEach(([id, label]) => { N(id, label, 'sector', 10); L('org', id, 0.15); });
+
+// DISCIPLINES
+const discs = [
+  ['d_hvac', 'HVAC'], ['d_elec', 'Electrical'], ['d_pfp', 'P/FP'],
+  ['d_it', 'IT'], ['d_av', 'AV'], ['d_security', 'Security'],
+  ['d_bldgint', 'Building Intel'], ['d_arcs', 'ARCS/DAS'],
+  ['d_energy', 'Energy/Carbon'], ['d_lightbox', 'LightBox'],
+  ['d_enviro', 'Environmental'], ['d_cx', 'Commissioning']
+];
+discs.forEach(([id, label]) => { N(id, label, 'discipline', 9); L('org', id, 0.12); });
+L('d_elec', 't_elec', 0.3); L('d_pfp', 't_mpfp', 0.25); L('d_security', 't_sec', 0.25);
+L('d_cx', 't_mpfp', 0.2); L('d_hvac', 't_mpfp', 0.2); L('d_energy', 't_elec', 0.15);
+
+// SPECIALTIES
+const specs = [
+  ['sp_fa', 'Fire Alarm', 12, 'New systems, FCC mods, large fit-outs'],
+  ['sp_mv', 'Med-Voltage Power', 12, 'All medium-voltage projects'],
+  ['sp_util', 'Utility Services', 12, 'Con Ed/PSEG/PECO — service & upgrades'],
+  ['sp_ups', 'UPS Systems', 11, 'Multi-module & >300kVA'],
+  ['sp_eps', 'EPS / Generators', 11, 'Emergency power systems'],
+  ['sp_ground', 'Grounding / LPS', 10, 'Lightning protection — new systems'],
+  ['sp_elev', 'Elevators', 10, 'New, motor/controller replacements'],
+  ['sp_rated', 'Rated Rooms', 10, '1-2hr rated for Gen/UPS/ATS/FA/BESS'],
+  ['sp_calc', 'Calcs & Distrib.', 11, 'Short circuit, VD, AIC, bus duct'],
+  ['sp_bess', 'BESS / PV / EV', 11, 'Battery, solar, hydrogen, EV charging'],
+  ['sp_ecode', 'Energy Code', 10, 'Lighting control & switched recepts'],
+  ['sp_misc', 'Misc. Systems', 9, 'BMU, lobby, terraces, etc.'],
+  ['sp_exist', 'Existing Bldg', 10, 'Code triggers — large renovations']
+];
+specs.forEach(([id, label, r, detail]) => { N(id, label, 'specialty', r, { detail }); L('t_elec', id, 0.25); });
+
+// CSI GROUPS
+const csiGroups = {
+  'cg_wiring': { label: 'Wiring & Raceways', csi: '2605xx', r: 14, detail: 'Wire, cable, raceways, grounding', children: ['260500','260502','260503','260506','260507','260513','260519','260520','260526','260529','260533','260536','260548','260548.13','260553','260573','260583'], trade: 't_elec', specLinks: ['sp_ground','sp_calc'] },
+  'cg_controls': { label: 'Lighting & Controls', csi: '2609xx–2651xx', r: 13, detail: 'Lighting controls, fixtures, interior/exterior', children: ['260923','265000','265100','00265100'], trade: 't_elec', specLinks: ['sp_ecode'] },
+  'cg_mv': { label: 'Medium-Voltage', csi: '2610xx–2613xx', r: 13, detail: 'MV distribution, transformers, switchgear', children: ['261000','261103','261216','261219','261313','261316'], trade: 't_elec', specLinks: ['sp_mv'] },
+  'cg_distrib': { label: 'LV Distribution', csi: '2622xx–2628xx', r: 15, detail: 'Transformers, switchboards, panels, PDUs, metering, devices', children: ['262213','262300','262413','262416','262500','262503','262600','262713','262719','262726','262813','262816','262819'], trade: 't_elec', specLinks: ['sp_calc','sp_util'] },
+  'cg_power': { label: 'Generators & UPS', csi: '2630xx–2637xx', r: 14, detail: 'Generators, UPS, batteries, ATS, load control', children: ['263000','263200','263213','263213.13','263222','263223','263323','263353','263353.13','263623','263624','263713'], trade: 't_elec', specLinks: ['sp_ups','sp_eps','sp_bess'] },
+  'cg_lps': { label: 'Lightning Protection', csi: '2641xx', r: 11, detail: 'Air terminals, grounding, conductors', children: ['264113'], trade: 't_elec', specLinks: ['sp_ground'] },
+  'cg_security': { label: 'Security Systems', csi: '2808–2813', r: 11, detail: 'Access control, security commissioning', children: ['280800','281300'], trade: 't_sec', specLinks: [] },
+  'cg_firealarm': { label: 'Fire Alarm', csi: '2831xx', r: 13, detail: 'Detection, notification, wiring', children: ['283100'], trade: 't_sec', specLinks: ['sp_fa'] },
+  'cg_mpfp': { label: 'MPFP / QC', csi: '200000', r: 16, detail: 'Inspections, commissioning, special inspections manual', children: ['200000'], trade: 't_mpfp', specLinks: [] },
+  'cg_general': { label: 'General / Misc', csi: 'various', r: 11, detail: 'Elevators, submittals, commissioning reqs, motors', children: ['140000','160000','230000','019113','260200','26000','260000','260800'], trade: 't_elec', specLinks: ['sp_elev','sp_misc'] }
+};
+
+const csiData = {
+  '200000':{ label:'QC & Inspections', docs:100, types:{ Forms:42, Guides:47, Templates:11 } },
+  '260000':{ label:'Electrical General', docs:31, types:{ Forms:6, Guides:15, Calculators:5, Specifications:2, Templates:3 } },
+  '260500':{ label:'Wiring & Raceways', docs:26, types:{ Templates:7, Details:17, Specifications:2 } },
+  '260502':{ label:'Wiring Methods', docs:1, types:{ Specifications:1 } },
+  '260503':{ label:'Equipment Wiring', docs:1, types:{ Specifications:1 } },
+  '260506':{ label:'Grounding & Bonding', docs:7, types:{ Details:5, Guides:1, Specifications:1 } },
+  '260507':{ label:'Hangers & Supports', docs:1, types:{ Specifications:1 } },
+  '260513':{ label:'MV Cables', docs:3, types:{ Specifications:2, Details:1 } },
+  '260519':{ label:'LV Wire & Cable', docs:7, types:{ Details:4, Specifications:1, Templates:2 } },
+  '260520':{ label:'LV Connectors', docs:5, types:{ Details:2, Specifications:1, Templates:2 } },
+  '260526':{ label:'Grounding Systems', docs:29, types:{ Details:23, Guides:1, Specifications:1, Templates:4 } },
+  '260529':{ label:'Hangers & Supports', docs:3, types:{ Details:1, Specifications:1, Templates:1 } },
+  '260533':{ label:'Raceways & Boxes', docs:15, types:{ Details:11, Specifications:2, Templates:2 } },
+  '260536':{ label:'Cable Trays', docs:1, types:{ Specifications:1 } },
+  '260548':{ label:'Seismic Controls', docs:2, types:{ Specifications:2 } },
+  '260548.13':{ label:'Seismic Templates', docs:1, types:{ Templates:1 } },
+  '260553':{ label:'System ID', docs:3, types:{ Details:1, Specifications:1, Templates:1 } },
+  '260573':{ label:'Overcurrent Protection', docs:2, types:{ Specifications:1, Templates:1 } },
+  '260583':{ label:'Wiring Connections', docs:1, types:{ Specifications:1 } },
+  '260800':{ label:'Elec Commissioning', docs:1, types:{ Specifications:1 } },
+  '260923':{ label:'Lighting Controls', docs:13, types:{ Details:11, Specifications:1, Templates:1 } },
+  '261000':{ label:'MV Distribution', docs:1, types:{ Guides:1 } },
+  '261103':{ label:'Station Batteries', docs:2, types:{ Details:1, Specifications:1 } },
+  '261216':{ label:'MV Dry Transformers', docs:1, types:{ Specifications:1 } },
+  '261219':{ label:'MV Liquid Transformers', docs:1, types:{ Specifications:1 } },
+  '261313':{ label:'MV Metal-Clad Swgr', docs:1, types:{ Specifications:1 } },
+  '261316':{ label:'MV Metal-Enc Swgr', docs:2, types:{ Details:1, Specifications:1 } },
+  '262213':{ label:'LV Transformers', docs:3, types:{ Details:1, Specifications:1, Templates:1 } },
+  '262300':{ label:'LV Switchgear', docs:2, types:{ Details:1, Specifications:1 } },
+  '262413':{ label:'Switchboards', docs:5, types:{ Details:1, Forms:2, Specifications:1, Templates:1 } },
+  '262416':{ label:'Panelboards', docs:11, types:{ Details:7, Forms:2, Specifications:1, Templates:1 } },
+  '262500':{ label:'Bus Assemblies', docs:4, types:{ Details:2, Specifications:1, Templates:1 } },
+  '262503':{ label:'Motor Control Ctrs', docs:1, types:{ Specifications:1 } },
+  '262600':{ label:'PDUs', docs:3, types:{ Details:2, Specifications:1 } },
+  '262713':{ label:'Metering', docs:5, types:{ Details:3, Specifications:1, Templates:1 } },
+  '262719':{ label:'Monitoring', docs:12, types:{ Details:11, Specifications:1 } },
+  '262726':{ label:'Wiring Devices', docs:16, types:{ Details:14, Specifications:1, Templates:1 } },
+  '262813':{ label:'Fuses', docs:2, types:{ Specifications:1, Templates:1 } },
+  '262816':{ label:'Switches & Breakers', docs:2, types:{ Specifications:1, Templates:1 } },
+  '262819':{ label:'Motor Controllers', docs:1, types:{ Specifications:1 } },
+  '263000':{ label:'BESS / Storage', docs:1, types:{ Guides:1 } },
+  '263200':{ label:'Packaged Gen Sets', docs:1, types:{ Specifications:1 } },
+  '263213':{ label:'Diesel Generators', docs:2, types:{ Specifications:2 } },
+  '263213.13':{ label:'Gen Commissioning', docs:7, types:{ Forms:3, Guides:2, Specifications:1, Templates:1 } },
+  '263222':{ label:'Gas Engine Gens', docs:1, types:{ Specifications:1 } },
+  '263223':{ label:'Gas Turbine Gens', docs:1, types:{ Specifications:1 } },
+  '263323':{ label:'Central Battery', docs:2, types:{ Details:1, Specifications:1 } },
+  '263353':{ label:'UPS Systems', docs:8, types:{ Details:5, Specifications:2, Templates:1 } },
+  '263353.13':{ label:'UPS Templates', docs:1, types:{ Templates:1 } },
+  '263623':{ label:'Auto Transfer Sw', docs:4, types:{ Forms:2, Specifications:1, Templates:1 } },
+  '263624':{ label:'Bypass Isolation', docs:1, types:{ Specifications:1 } },
+  '263713':{ label:'Gen Load Control', docs:2, types:{ Details:1, Specifications:1 } },
+  '264113':{ label:'Lightning Protection', docs:13, types:{ Details:12, Specifications:1 } },
+  '265000':{ label:'Lighting General', docs:3, types:{ Guides:3 } },
+  '265100':{ label:'Interior/Ext Lighting', docs:23, types:{ Specifications:2, Details:16, Guides:2, Templates:3 } },
+  '280800':{ label:'Security CX', docs:1, types:{ Specifications:1 } },
+  '281300':{ label:'Access Control', docs:4, types:{ Details:4 } },
+  '283100':{ label:'Fire Alarm Systems', docs:31, types:{ Details:13, Specifications:4, Guides:6, Templates:8 } },
+  '140000':{ label:'Elevators', docs:3, types:{ Templates:2, Guides:1 } },
+  '160000':{ label:'General Submittals', docs:1, types:{ Templates:1 } },
+  '230000':{ label:'Motors', docs:1, types:{ Templates:1 } },
+  '019113':{ label:'CX Requirements', docs:1, types:{ Specifications:1 } },
+  '260200':{ label:'Prepurchase', docs:1, types:{ Specifications:1 } },
+  '00265100':{ label:'Fixture Mounting', docs:1, types:{ Details:1 } },
+  '26000':{ label:'Cover Sheets', docs:1, types:{ Templates:1 } }
+};
+
+Object.entries(csiGroups).forEach(([gid, g]) => {
+  let totalDocs = 0;
+  g.children.forEach(c => { if (csiData[c]) totalDocs += csiData[c].docs; });
+  N(gid, g.label, 'csiGroup', g.r, { detail: g.detail, csi: g.csi, stat: `${totalDocs} documents`, docs: totalDocs });
+  L(g.trade, gid, 0.35);
+  g.specLinks.forEach(sp => L(gid, sp, 0.2));
+
+  g.children.forEach(csi => {
+    const d = csiData[csi];
+    if (!d) return;
+    const lid = 'csi_' + csi.replace('.', '_');
+    N(lid, d.label, 'csiSub', Math.max(5, Math.min(14, Math.sqrt(d.docs) * 3)), { csi, detail: `CSI ${csi}`, stat: `${d.docs} doc${d.docs > 1 ? 's' : ''}`, docs: d.docs, types: d.types });
+    L(gid, lid, 0.4);
+    Object.entries(d.types).forEach(([t, c]) => {
+      const rid = 'r_' + t.toLowerCase();
+      if (nodes.find(n => n.id === rid)) L(lid, rid, 0.04 + c * 0.015);
+    });
+  });
+});
+
+L('s_datacenter', 'sp_mv', 0.12); L('s_datacenter', 'sp_ups', 0.12); L('s_datacenter', 'sp_bess', 0.1);
+L('s_health', 'sp_eps', 0.1); L('s_health', 'sp_fa', 0.1);
+L('s_commercial', 'sp_elev', 0.1); L('s_commercial', 'sp_util', 0.1);
+L('s_infra', 'sp_mv', 0.08); L('s_aviation', 'sp_fa', 0.08);
+L('s_residential', 'sp_ecode', 0.08);
+L('d_cx', 'cg_mpfp', 0.15); L('d_cx', 'cg_general', 0.1);
+L('d_energy', 'cg_controls', 0.1); L('d_energy', 'cg_power', 0.1);
+L('d_security', 'cg_security', 0.15); L('d_security', 'cg_firealarm', 0.15);
+
+document.getElementById('nodeCount').textContent = nodes.length;
+document.getElementById('linkCount').textContent = links.length;
+
+// ─── SVG SETUP ───
+const svg = d3.select('body').append('svg').attr('width', W).attr('height', H);
+const defs = svg.append('defs');
+
+// Glow filter
+const glow = defs.append('filter').attr('id', 'glow').attr('x', '-60%').attr('y', '-60%').attr('width', '220%').attr('height', '220%');
+glow.append('feGaussianBlur').attr('stdDeviation', '3').attr('result', 'b');
+const gm = glow.append('feMerge'); gm.append('feMergeNode').attr('in', 'b'); gm.append('feMergeNode').attr('in', 'SourceGraphic');
+
+// Soft glow
+const glow2 = defs.append('filter').attr('id', 'glow2').attr('x', '-120%').attr('y', '-120%').attr('width', '340%').attr('height', '340%');
+glow2.append('feGaussianBlur').attr('stdDeviation', '10').attr('result', 'b');
+const gm2 = glow2.append('feMerge'); gm2.append('feMergeNode').attr('in', 'b'); gm2.append('feMergeNode').attr('in', 'SourceGraphic');
+
+// Core radial gradient
+const radGrad = defs.append('radialGradient').attr('id', 'coreGrad');
+radGrad.append('stop').attr('offset', '0%').attr('stop-color', '#ef4444').attr('stop-opacity', '0.25');
+radGrad.append('stop').attr('offset', '100%').attr('stop-color', '#ef4444').attr('stop-opacity', '0.04');
+
+const g = svg.append('g');
+const zoom = d3.zoom().scaleExtent([0.1, 6]).on('zoom', e => g.attr('transform', e.transform));
+svg.call(zoom);
+
+// ─── SIMULATION ───
+const sim = d3.forceSimulation(nodes)
+  .force('link', d3.forceLink(links).id(d => d.id).distance(d => {
+    const sg = d.source.group || '', tg = d.target.group || '';
+    if (sg === 'core' || tg === 'core') return 220;
+    if (sg === 'trade' || tg === 'trade') return 150;
+    if (sg === 'csiGroup' || tg === 'csiGroup') return 85;
+    if (sg === 'csiSub' || tg === 'csiSub') return 52;
+    return 95;
+  }).strength(d => d.strength || 0.2))
+  .force('charge', d3.forceManyBody().strength(d => {
+    if (d.group === 'core') return -900;
+    if (d.group === 'trade') return -450;
+    if (d.group === 'csiGroup') return -220;
+    return -85;
+  }))
+  .force('center', d3.forceCenter(W / 2, H / 2))
+  .force('collision', d3.forceCollide().radius(d => d.r + 5))
+  .force('x', d3.forceX(W / 2).strength(0.02))
+  .force('y', d3.forceY(H / 2).strength(0.02));
+
+// ─── LINKS ───
+const link = g.append('g').attr('class', 'links').selectAll('line').data(links).join('line')
+  .attr('stroke', d => {
+    const sg = typeof d.source === 'object' ? d.source.group : '';
+    if (sg === 'csiGroup') return C.csiSub;
+    if (sg === 'trade') return C.trade;
+    return '#0f1f35';
+  })
+  .attr('stroke-opacity', d => d.strength > 0.3 ? 0.18 : 0.08)
+  .attr('stroke-width', d => Math.max(0.4, (d.strength || 0.2) * 2.5));
+
+// ─── NODE GROUPS ───
+const node = g.append('g').attr('class', 'nodes').selectAll('g').data(nodes).join('g')
+  .call(d3.drag().on('start', dragStart).on('drag', dragDrag).on('end', dragEnd));
+
+// Outer glow ring
+node.append('circle').attr('class', 'ring')
+  .attr('r', d => d.r + 5)
+  .attr('fill', 'none')
+  .attr('stroke', d => C[d.group] || '#334')
+  .attr('stroke-opacity', 0.06)
+  .attr('stroke-width', 1.5);
+
+// Main body
+node.append('circle').attr('class', 'main')
+  .attr('r', d => d.r)
+  .attr('fill', d => {
+    const c = d3.color(C[d.group] || '#3b82f6');
+    if (c) { c.opacity = 0.1; return c + ''; }
+    return 'rgba(59,130,246,0.1)';
+  })
+  .attr('stroke', d => C[d.group] || '#3b82f6')
+  .attr('stroke-width', d => d.group === 'core' ? 2.5 : d.group === 'trade' ? 2 : 1)
+  .attr('filter', 'url(#glow)');
+
+// Core ambient halo
+node.filter(d => d.group === 'core').append('circle')
+  .attr('r', d => d.r + 20)
+  .attr('fill', 'url(#coreGrad)')
+  .attr('filter', 'url(#glow2)');
+
+// Inner fill proportional to doc count
+node.filter(d => d.docs && d.docs > 5).append('circle')
+  .attr('r', d => Math.min(d.r - 3, Math.sqrt(d.docs) * 0.65))
+  .attr('fill', d => C[d.group] || '#3b82f6')
+  .attr('fill-opacity', 0.12);
+
+// ─── LABELS ───
+let labelsOn = true;
+const labels = node.append('text')
+  .text(d => d.label)
+  .attr('text-anchor', 'middle')
+  .attr('dy', d => d.r + 13)
+  .attr('fill', d => C[d.group] || '#3b82f6')
+  .attr('font-family', "'Syne', sans-serif")
+  .attr('font-size', d => {
+    if (d.group === 'core') return 12;
+    if (d.group === 'trade') return 11;
+    if (d.group === 'csiGroup') return 10;
+    return 8.5;
+  })
+  .attr('font-weight', d => d.group === 'core' || d.group === 'trade' ? 700 : d.group === 'csiGroup' ? 600 : 400)
+  .attr('opacity', d => {
+    if (d.group === 'core' || d.group === 'trade') return 0.9;
+    if (d.group === 'csiGroup' || d.group === 'resource') return 0.65;
+    return 0.4;
+  })
+  .style('paint-order', 'stroke')
+  .style('stroke', 'rgba(4,7,15,0.9)')
+  .style('stroke-width', '3px')
+  .style('pointer-events', 'none');
+
+// ─── TOOLTIP ───
+const tooltip = d3.select('#tooltip');
+
+node
+  .on('mouseover', function (e, d) {
+    d3.select(this).select('.main').transition().duration(120).attr('r', d.r * 1.3);
+    d3.select(this).select('.ring').transition().duration(120).attr('stroke-opacity', 0.25);
+
+    const conn = new Set();
+    links.forEach(l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      if (sid === d.id) conn.add(tid);
+      if (tid === d.id) conn.add(sid);
+    });
+
+    node.transition().duration(150).attr('opacity', n => n.id === d.id || conn.has(n.id) ? 1 : 0.06);
+    link.transition().duration(150)
+      .attr('stroke-opacity', l => {
+        const sid = typeof l.source === 'object' ? l.source.id : l.source;
+        const tid = typeof l.target === 'object' ? l.target.id : l.target;
+        return sid === d.id || tid === d.id ? 0.65 : 0.01;
+      })
+      .attr('stroke-width', l => {
+        const sid = typeof l.source === 'object' ? l.source.id : l.source;
+        const tid = typeof l.target === 'object' ? l.target.id : l.target;
+        return sid === d.id || tid === d.id ? 2.5 : 0.3;
+      });
+
+    const groupLabel = { core: 'CORE', trade: 'TRADE', csiGroup: 'CSI GROUP', csiSub: 'CSI SECTION', sector: 'SECTOR', resource: 'RESOURCE TYPE', discipline: 'DISCIPLINE', specialty: 'SPECIALTY' }[d.group] || d.group.toUpperCase();
+
+    let html = `<div class="tt-eyebrow">${groupLabel}</div>`;
+    html += `<div class="tt-title">${d.label}</div>`;
+    if (d.csi) html += `<div class="tt-csi">CSI ${d.csi}</div>`;
+    if (d.detail) html += `<div class="tt-detail">${d.detail}</div>`;
+    if (d.stat) html += `<div class="tt-stat">${d.stat}</div>`;
+    if (d.types) {
+      const total = Object.values(d.types).reduce((a, b) => a + b, 0);
+      html += `<div class="tt-types">`;
+      Object.entries(d.types).forEach(([t, c]) => {
+        const pct = Math.round(c / total * 100);
+        const col = typeColors[t] || '#555';
+        html += `<span class="tt-type-pill" style="background:${col}18;border:1px solid ${col}44;color:${col}">${t} ${c}</span>`;
+      });
+      html += `</div>`;
+    }
+    html += `<div class="tt-connections">${conn.size} connections</div>`;
+    tooltip.html(html).style('opacity', 1).style('left', (e.clientX + 18) + 'px').style('top', (e.clientY - 10) + 'px');
+  })
+  .on('mousemove', function (e) {
+    tooltip.style('left', (e.clientX + 18) + 'px').style('top', (e.clientY - 10) + 'px');
+  })
+  .on('mouseout', function (e, d) {
+    d3.select(this).select('.main').transition().duration(200).attr('r', d.r);
+    d3.select(this).select('.ring').transition().duration(200).attr('stroke-opacity', d.fx != null ? 0.3 : 0.06);
+    node.transition().duration(250).attr('opacity', 1);
+    link.transition().duration(250)
+      .attr('stroke-opacity', l => l.strength > 0.3 ? 0.18 : 0.08)
+      .attr('stroke-width', l => Math.max(0.4, (l.strength || 0.2) * 2.5));
+    tooltip.style('opacity', 0);
+  })
+  .on('click', function (e, d) {
+    d.fx = d.fx != null ? null : d.x;
+    d.fy = d.fy != null ? null : d.y;
+    d3.select(this).select('.ring')
+      .transition().duration(200)
+      .attr('stroke-opacity', d.fx != null ? 0.4 : 0.06)
+      .attr('stroke-width', d.fx != null ? 2.5 : 1.5);
+  });
+
+// ─── TICK ───
+sim.on('tick', () => {
+  link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+    .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+  node.attr('transform', d => `translate(${d.x},${d.y})`);
+});
+
+// ─── CONTROLS ───
+function resetView() {
+  svg.transition().duration(800).ease(d3.easeCubicOut).call(zoom.transform, d3.zoomIdentity);
+  nodes.forEach(n => { n.fx = null; n.fy = null; });
+  node.selectAll('.ring').attr('stroke-opacity', 0.06).attr('stroke-width', 1.5);
+  sim.alpha(0.5).restart();
+}
+
+function toggleLabels() {
+  labelsOn = !labelsOn;
+  labels.transition().duration(300).attr('opacity', labelsOn ? d => {
+    if (d.group === 'core' || d.group === 'trade') return 0.9;
+    if (d.group === 'csiGroup' || d.group === 'resource') return 0.65;
+    return 0.4;
+  } : 0);
+  document.getElementById('btnLabels').classList.toggle('active', labelsOn);
+}
+
+let pulsing = false, pulseTimer;
+function toggleParticles() {
+  pulsing = !pulsing;
+  document.getElementById('btnPulse').classList.toggle('active', pulsing);
+  if (pulsing) startPulse();
+  else { clearInterval(pulseTimer); g.selectAll('.pulse').remove(); }
+}
+
+function startPulse() {
+  pulseTimer = setInterval(() => {
+    const l = links[Math.floor(Math.random() * links.length)];
+    if (!l.source.x) return;
+    const col = C[l.source.group] || '#3b82f6';
+    g.append('circle').attr('class', 'pulse')
+      .attr('cx', l.source.x).attr('cy', l.source.y)
+      .attr('r', 2.5).attr('fill', col).attr('opacity', 0.8)
+      .transition().duration(1300).ease(d3.easeQuadIn)
+      .attr('cx', l.target.x).attr('cy', l.target.y)
+      .attr('r', 1).attr('opacity', 0)
+      .remove();
+  }, 75);
+}
+
+function onSearch(val) {
+  const q = val.toLowerCase().trim();
+  if (!q) { node.transition().duration(200).attr('opacity', 1); return; }
+  node.transition().duration(200).attr('opacity', d =>
+    d.label.toLowerCase().includes(q) || (d.csi && d.csi.includes(q)) || (d.detail && d.detail.toLowerCase().includes(q)) ? 1 : 0.05
+  );
+}
+
+// ─── FILTER BAR ───
+const filterDefs = [
+  { id: 'all', label: 'All', filter: null },
+  { id: 'trade', label: 'Trades', filter: 'trade' },
+  { id: 'csiGroup', label: 'CSI Groups', filter: 'csiGroup' },
+  { id: 'csiSub', label: 'CSI Sections', filter: 'csiSub' },
+  { id: 'sector', label: 'Sectors', filter: 'sector' },
+  { id: 'discipline', label: 'Disciplines', filter: 'discipline' },
+  { id: 'specialty', label: 'Specialties', filter: 'specialty' },
+  { id: 'resource', label: 'Resources', filter: 'resource' },
+];
+
+const fb = document.getElementById('filterBar');
+filterDefs.forEach(fd => {
+  const btn = document.createElement('button');
+  btn.className = 'filter-btn' + (fd.filter === null ? ' active' : '');
+  btn.textContent = fd.label;
+  btn.onclick = () => {
+    fb.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (!fd.filter) {
+      node.transition().duration(300).attr('opacity', 1);
+      link.transition().duration(300).attr('stroke-opacity', l => l.strength > 0.3 ? 0.18 : 0.08);
+    } else {
+      const relIds = new Set();
+      nodes.filter(n => n.group === fd.filter).forEach(n => {
+        relIds.add(n.id);
+        links.forEach(l => {
+          const sid = typeof l.source === 'object' ? l.source.id : l.source;
+          const tid = typeof l.target === 'object' ? l.target.id : l.target;
+          if (sid === n.id) relIds.add(tid);
+          if (tid === n.id) relIds.add(sid);
+        });
+      });
+      node.transition().duration(300).attr('opacity', n => relIds.has(n.id) ? 1 : 0.04);
+      link.transition().duration(300).attr('stroke-opacity', l => {
+        const sid = typeof l.source === 'object' ? l.source.id : l.source;
+        const tid = typeof l.target === 'object' ? l.target.id : l.target;
+        return relIds.has(sid) && relIds.has(tid) ? 0.4 : 0.01;
+      });
+    }
+  };
+  fb.appendChild(btn);
+});
+
+// ─── DRAG ───
+function dragStart(e, d) { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }
+function dragDrag(e, d) { d.fx = e.x; d.fy = e.y; }
+function dragEnd(e, d) { if (!e.active) sim.alphaTarget(0); }
+</script>
+</body>
+</html>
